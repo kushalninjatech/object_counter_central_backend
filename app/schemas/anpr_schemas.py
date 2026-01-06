@@ -25,6 +25,14 @@ class AnprDetectionUploadRequest(BaseModel):
         description="Vehicle tracking ID",
         max_length=100
     )
+    activity_type: Optional[str] = Field(
+        None,
+        description="Activity type: in or out"
+    )
+    detected_at: Optional[datetime] = Field(
+        None,
+        description="Client-side detection timestamp"
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -35,7 +43,9 @@ class AnprDetectionUploadRequest(BaseModel):
                     "camera_id": "CAM001",
                     "camera_name": "Main Gate Camera",
                     "vehicle_class": "car",
-                    "vehicle_track_id": "TRK-12345"
+                    "vehicle_track_id": "TRK-12345",
+                    "activity_type": "in",
+                    "detected_at": "2025-01-15T10:30:00Z"
                 }
             ]
         }
@@ -53,7 +63,7 @@ class AnprDetectionUploadResponse(BaseModel):
         description="Client's tracking ID (if provided)"
     )
     status: ProcessingStatus = Field(..., description="Current processing status")
-    received_at: datetime = Field(..., description="When detection was received")
+    created_at: datetime = Field(..., description="When detection was received by server")
 
     model_config = {
         "json_schema_extra": {
@@ -64,7 +74,7 @@ class AnprDetectionUploadResponse(BaseModel):
                     "detection_id": 12345,
                     "client_detection_id": "CAM001-20250101-000123",
                     "status": "pending",
-                    "received_at": "2025-01-15T10:30:00Z"
+                    "created_at": "2025-01-15T10:30:00Z"
                 }
             ]
         }
@@ -80,10 +90,14 @@ class AnprDetectionResultResponse(BaseModel):
         description="Client's tracking ID"
     )
     organization_id: int = Field(..., description="Organization ID")
+    organization_name: Optional[str] = Field(None, description="Organization name")
     camera_id: str = Field(..., description="Camera ID")
     camera_name: Optional[str] = Field(None, description="Camera name")
-    vehicle_class: Optional[str] = Field(None, description="Vehicle class")
+    object_type: Optional[str] = Field(None, description="Object/Vehicle type")
     vehicle_track_id: Optional[str] = Field(None, description="Vehicle tracking ID")
+    activity_type: Optional[str] = Field(None, description="Activity type: in or out")
+    detected_at: Optional[datetime] = Field(None, description="Client-side detection timestamp")
+    image_url: Optional[str] = Field(None, description="URL to access the detection image")
 
     # Processing status
     status: ProcessingStatus = Field(..., description="Processing status")
@@ -91,7 +105,7 @@ class AnprDetectionResultResponse(BaseModel):
     error_message: Optional[str] = Field(None, description="Error message if failed")
 
     # Timestamps
-    created_at: datetime = Field(..., description="When detection was created")
+    created_at: datetime = Field(..., description="Server received timestamp")
     updated_at: datetime = Field(..., description="When detection was last updated")
 
     # LLM Results (null if not yet processed)
@@ -99,7 +113,6 @@ class AnprDetectionResultResponse(BaseModel):
         None,
         description="Whether numberplate is visible"
     )
-    numberplate_text: Optional[str] = Field(None, description="Numberplate text")
     numberplate_color: Optional[NumberplateColor] = Field(
         None,
         description="Numberplate color"
@@ -119,6 +132,8 @@ class AnprDetectionResultResponse(BaseModel):
                     "camera_name": "Main Gate Camera",
                     "vehicle_class": "car",
                     "vehicle_track_id": "TRK-12345",
+                    "activity_type": "in",
+                    "detected_at": "2025-01-15T10:30:00Z",
                     "status": "success",
                     "retry_count": 0,
                     "error_message": None,

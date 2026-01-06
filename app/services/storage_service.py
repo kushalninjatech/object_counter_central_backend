@@ -36,7 +36,7 @@ class StorageService:
             self.upload_dir.mkdir(parents=True, exist_ok=True)
             logger.info(f"Storage service initialized with local storage: {self.upload_dir}")
 
-    def _generate_file_path(self, organization_id: int, original_filename: str) -> Tuple[str, str]:
+    def _generate_file_path(self, organization_id: int, original_filename: str) -> str:
         """
         Generate a unique file path for storing the image.
 
@@ -45,32 +45,24 @@ class StorageService:
             original_filename: Original name of the uploaded file
 
         Returns:
-            Tuple of (storage_path, unique_filename)
-            - storage_path: Full path where file will be stored
-            - unique_filename: Generated unique filename
+            relative_path: Relative path from uploads directory (e.g., "detections/1/2025/01/uuid.jpg")
+                          This will be accessible via /uploads/{relative_path}
         """
         # Extract file extension
         file_ext = Path(original_filename).suffix.lower()
         if not file_ext:
             file_ext = ".jpg"  # Default to jpg if no extension
 
-        # Generate unique filename: {org_id}/{year}/{month}/{uuid}.{ext}
+        # Generate unique filename: detections/{org_id}/{year}/{month}/{uuid}.{ext}
         now = datetime.utcnow()
         year_month = f"{now.year}/{now.month:02d}"
         unique_id = str(uuid.uuid4())
         unique_filename = f"{unique_id}{file_ext}"
 
-        # Build storage path
-        relative_path = f"{organization_id}/{year_month}/{unique_filename}"
+        # Build relative path - this will be stored in DB and accessible via /uploads/
+        relative_path = f"detections/{organization_id}/{year_month}/{unique_filename}"
 
-        if self.storage_type == "s3":
-            # S3 path: s3://bucket/prefix/org_id/year/month/uuid.ext
-            storage_path = f"{self.folder_prefix}/{relative_path}"
-        else:
-            # Local path: uploads/org_id/year/month/uuid.ext
-            storage_path = str(self.upload_dir / relative_path)
-
-        return storage_path, unique_filename
+        return relative_path
 
     async def save_file(
         self,
@@ -85,12 +77,12 @@ class StorageService:
             organization_id: ID of the organization
 
         Returns:
-            Storage path where file was saved
+            relative_path: Relative path that can be used to access file via /uploads/{relative_path}
 
         Raises:
             Exception: If file upload fails
         """
-        storage_path, unique_filename = self._generate_file_path(
+        relative_path = self._generate_file_path(
             organization_id,
             file.filename or "image.jpg"
         )
@@ -101,9 +93,10 @@ class StorageService:
 
             if self.storage_type == "s3":
                 # Upload to S3
+                s3_key = f"{self.folder_prefix}/{relative_path}"
                 self.s3_client.put_object(
                     Bucket=self.bucket_name,
-                    Key=storage_path,
+                    Key=s3_key,
                     Body=file_content,
                     ContentType=file.content_type or "image/jpeg",
                     Metadata={
@@ -111,18 +104,18 @@ class StorageService:
                         'original_filename': file.filename or "unknown"
                     }
                 )
-                logger.info(f"File uploaded to S3: s3://{self.bucket_name}/{storage_path}")
+                logger.info(f"File uploaded to S3: s3://{self.bucket_name}/{s3_key}")
             else:
                 # Save to local filesystem
-                local_path = Path(storage_path)
-                local_path.parent.mkdir(parents=True, exist_ok=True)
+                full_path = self.upload_dir / relative_path
+                full_path.parent.mkdir(parents=True, exist_ok=True)
 
-                with open(local_path, 'wb') as f:
+                with open(full_path, 'wb') as f:
                     f.write(file_content)
 
-                logger.info(f"File saved locally: {storage_path}")
+                logger.info(f"File saved locally: {full_path}")
 
-            return storage_path
+            return relative_path
 
         except ClientError as e:
             logger.error(f"S3 upload failed: {e}")

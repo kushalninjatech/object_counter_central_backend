@@ -13,7 +13,7 @@ from app.db.session import init_db
 
 # Import routers
 from app.api.v1 import organizations
-from app.api.v1.endpoints import anpr, admin
+from app.api.v1.endpoints import anpr, admin, analytics
 
 
 @asynccontextmanager
@@ -83,6 +83,12 @@ app.include_router(
     admin.router,
     prefix=f"{settings.API_V1_PREFIX}/admin",
     tags=["Admin"]
+)
+
+app.include_router(
+    analytics.router,
+    prefix=f"{settings.API_V1_PREFIX}/analytics",
+    tags=["Analytics"]
 )
 
 

@@ -2,7 +2,6 @@
 ANPR Detection model - Vehicle detections with LLM-based numberplate recognition.
 """
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum, Text
-from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import enum
 
@@ -38,6 +37,10 @@ class VehicleSide(str, enum.Enum):
     UNKNOWN = "unknown"
 
 
+# ActivityType values (no longer an enum, just plain strings)
+# Valid values: "in", "out"
+
+
 class AnprDetection(Base, BaseModel):
     """
     ANPR Detection model with LLM-based numberplate recognition.
@@ -67,8 +70,11 @@ class AnprDetection(Base, BaseModel):
     # Vehicle Detection Info
     vehicle_class = Column(String(50), nullable=True, index=True)  # car, truck, bus, motorcycle
     vehicle_track_id = Column(String(100), nullable=True, index=True)  # Track ID from detection system
+    activity_type = Column(String(10), nullable=True, index=True)  # in/out
+    detected_at = Column(DateTime(timezone=True), nullable=True, index=True)  # Client-side detection timestamp
 
-    # Image Storage (S3 path or local filesystem)
+    # Image Storage (relative path from uploads directory)
+    # Will be served via /uploads/{image_path}
     image_path = Column(String(512), nullable=False)
 
     # Processing Status & Retry Logic
@@ -92,12 +98,6 @@ class AnprDetection(Base, BaseModel):
     llm_raw_response = Column(Text, nullable=True)  # Store raw LLM response for debugging
 
     # Timestamps
-    received_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-        index=True
-    )
     processed_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
