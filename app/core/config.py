@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     S3_FOLDER_PREFIX: str = "anpr-detections"  # Folder inside bucket
 
     # Google Gemini LLM
-    GOOGLE_API_KEY: str = "AIzaSyAMWWXFpl12rjuZ-0r-3hJNUa_EKCBVv7c"  # Set via environment variable
+    GOOGLE_API_KEY: str = ""  # Set via environment variable
 
     # Logging
     LOG_LEVEL: str = "INFO"

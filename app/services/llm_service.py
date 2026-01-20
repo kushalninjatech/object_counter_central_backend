@@ -2,6 +2,8 @@
 LLM Service for numberplate extraction using Google Gemini.
 """
 import base64
+import json
+import re
 from typing import Optional
 
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -19,7 +21,9 @@ class LLMService:
     """
     Service for extracting numberplate information from vehicle images using LLM.
 
-    Uses Google Gemini Flash model with structured output via LangChain.
+    Uses Google Gemini Flash model with manual JSON parsing.
+    Note: with_structured_output() has known issues with Gemini returning None
+    due to MALFORMED_FUNCTION_CALL errors, so we use direct invocation instead.
     """
 
     def __init__(self):
@@ -27,22 +31,34 @@ class LLMService:
         if not settings.GOOGLE_API_KEY:
             raise ValueError("GOOGLE_API_KEY not set in environment variables")
 
-        # Initialize Gemini Flash model with structured output
+        # Initialize Gemini Flash model
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-3-flash-preview",  # Latest flash model
+            model="gemini-3-flash-preview",
             google_api_key=settings.GOOGLE_API_KEY,
-            temperature=0,  # Deterministic output
-            max_tokens=None,  # No limit on output
-            timeout=None,
+            temperature=0,
             max_retries=2,
         )
 
-        # Create structured output parser
-        self.structured_llm = self.llm.with_structured_output(
-            NumberplateExtractionResult
-        )
-
         logger.info("LLM Service initialized with Gemini Flash")
+
+    def _parse_json_response(self, response_text: str) -> dict:
+        """
+        Parse JSON from LLM response text.
+        Handles markdown code blocks and raw JSON.
+        """
+        # Try to extract JSON from markdown code block
+        json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response_text)
+        if json_match:
+            json_str = json_match.group(1).strip()
+        else:
+            # Try to find raw JSON object
+            json_match = re.search(r'\{[\s\S]*\}', response_text)
+            if json_match:
+                json_str = json_match.group(0)
+            else:
+                json_str = response_text.strip()
+
+        return json.loads(json_str)
 
     def extract_numberplate(
         self,
@@ -84,28 +100,36 @@ class LLMService:
                 ]
             )
 
-            # Call LLM with structured output
+            # Call LLM directly (not with_structured_output which fails with Gemini)
             logger.info("Sending image to Gemini Flash LLM...")
-            result: NumberplateExtractionResult = self.structured_llm.invoke([message])
+            response = self.llm.invoke([message])
 
-            # Handle None response from LLM (schema mismatch or parsing failure)
-            if result is None:
-                logger.warning("LLM returned None - schema mismatch or parsing failure")
-                from app.schemas.llm_schemas import NumberplateColor, VehicleSide
+            # Log full LLM response
+            logger.info(f"LLM raw response: {response.content}")
+
+            # Parse JSON from response and validate with Pydantic
+            try:
+                json_data = self._parse_json_response(response.content)
+                result = NumberplateExtractionResult(**json_data)
+            except (json.JSONDecodeError, ValueError) as parse_error:
+                logger.warning(f"Failed to parse LLM response: {parse_error}")
                 result = NumberplateExtractionResult(
                     numberplate_available=False,
-                    numberplate_text=None,
-                    numberplate_color=NumberplateColor.UNKNOWN,
-                    vehicle_side=VehicleSide.UNKNOWN,
+                    numberplate_text="N/A",
+                    numberplate_color="unknown",
+                    vehicle_side="unknown",
                     confidence_score=0.0,
-                    reasoning="LLM failed to generate structured output - schema mismatch"
+                    reasoning="N/A"
                 )
 
             logger.info(
                 f"LLM extraction complete: "
-                f"available={result.numberplate_available}, "
-                f"text={result.numberplate_text}, "
-                f"confidence={result.confidence_score}"
+                f"numberplate_available={result.numberplate_available}, "
+                f"numberplate_text={result.numberplate_text}, "
+                f"numberplate_color={result.numberplate_color}, "
+                f"vehicle_side={result.vehicle_side}, "
+                f"confidence_score={result.confidence_score}, "
+                f"reasoning={result.reasoning}"
             )
 
             return result
@@ -119,13 +143,18 @@ class LLMService:
         Validate if image file is readable.
 
         Args:
-            image_path: Path to image file
+            image_path: Relative path to image file (e.g., "detections/1/2025/01/uuid.jpg")
 
         Returns:
             True if image is valid, False otherwise
         """
         try:
-            with Image.open(image_path) as img:
+            # Use storage service to get full path
+            storage_service = get_storage_service()
+            image_data = storage_service.get_file(image_path)
+            # Validate by attempting to open with PIL
+            from io import BytesIO
+            with Image.open(BytesIO(image_data)) as img:
                 img.verify()
             return True
         except Exception as exc:

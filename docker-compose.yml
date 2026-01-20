@@ -49,6 +49,7 @@ services:
       - ./app:/app/app
       - ./scripts:/app/scripts
       - ./uploads:/app/uploads
+      - ./detections:/app/detections
       - ./logs:/app/logs
     depends_on:
       postgres:
@@ -73,6 +74,7 @@ services:
       - ./app:/app/app
       - ./scripts:/app/scripts
       - ./uploads:/app/uploads
+      - ./detections:/app/detections
       - ./logs:/app/logs
     depends_on:
       postgres:

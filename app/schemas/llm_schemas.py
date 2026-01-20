@@ -1,7 +1,7 @@
 """
 Pydantic schemas for LLM structured output.
 """
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel, Field
 from enum import Enum
 
@@ -37,55 +37,27 @@ class NumberplateExtractionResult(BaseModel):
         description="Whether a numberplate is visible and readable in the image"
     )
 
-    numberplate_text: Optional[str] = Field(
-        default=None,
-        description=(
-            "The text on the numberplate if available. "
-            "Should be in uppercase without spaces. "
-            "Example: MH12AB1234"
-        )
+    numberplate_text: str = Field(
+        default="N/A",
+        description="The numberplate text in uppercase without spaces, e.g. MH12AB1234. Use N/A if not available."
     )
 
-    numberplate_color: NumberplateColor = Field(
-        default=NumberplateColor.UNKNOWN,
-        description=(
-            "Color of the numberplate background. "
-            "Options: white (private vehicles), yellow (commercial taxis/autos), "
-            "black (rental), blue (diplomatic), red (temporary), green (electric)"
-        )
+    numberplate_color: Literal["white", "yellow", "black", "blue", "red", "green", "unknown"] = Field(
+        default="unknown",
+        description="Color of the numberplate: white, yellow, black, blue, red, green, or unknown"
     )
 
-    vehicle_side: VehicleSide = Field(
-        default=VehicleSide.UNKNOWN,
-        description="Which side of the vehicle is visible in the image"
+    vehicle_side: Literal["front", "back", "side", "unknown"] = Field(
+        default="unknown",
+        description="Which side of the vehicle is visible: front, back, side, or unknown"
     )
 
     confidence_score: float = Field(
         default=0.0,
-        ge=0.0,
-        le=1.0,
-        description="Confidence score for the numberplate text extraction (0.0 to 1.0)"
+        description="Confidence score from 0.0 to 1.0"
     )
 
-    reasoning: Optional[str] = Field(
-        default=None,
-        description=(
-            "Brief explanation of the extraction result. "
-            "Why the numberplate was or wasn't readable."
-        )
+    reasoning: str = Field(
+        default="N/A",
+        description="Brief explanation of the extraction result"
     )
-
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "numberplate_available": True,
-                    "numberplate_text": "MH12AB1234",
-                    "numberplate_color": "white",
-                    "vehicle_side": "front",
-                    "confidence_score": 0.95,
-                    "reasoning": "Clear front view with well-lit numberplate"
-                }
-            ]
-        }
-    }

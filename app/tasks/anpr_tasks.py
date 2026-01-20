@@ -4,7 +4,6 @@ Celery tasks for ANPR detection processing with LLM.
 from celery import Task
 from sqlalchemy.orm import Session
 from datetime import datetime
-import json
 
 from app.core.celery_app import celery_app
 from app.core.logging import app_logger as logger
@@ -93,12 +92,12 @@ def process_anpr_detection(self, detection_id: int):
         update_data = {
             "status": ProcessingStatus.SUCCESS,
             "processed_at": datetime.utcnow(),
-            "numberplate_available": llm_result.numberplate_available,
-            "numberplate_text": llm_result.numberplate_text if llm_result.numberplate_available else None,
-            "numberplate_color": llm_result.numberplate_color.value,
-            "vehicle_side": llm_result.vehicle_side.value,
-            "llm_confidence": str(llm_result.confidence_score),  # Store as string: "0.95"
-            "llm_raw_response": llm_result.reasoning,
+            "numberplate_available": llm_result.numberplate_available if llm_result else False,
+            "numberplate_text": llm_result.numberplate_text if llm_result and llm_result.numberplate_text else "N/A",
+            "numberplate_color": llm_result.numberplate_color if llm_result and llm_result.numberplate_color else "N/A",
+            "vehicle_side": llm_result.vehicle_side if llm_result and llm_result.vehicle_side else "N/A",
+            "llm_confidence": str(llm_result.confidence_score) if llm_result else "0.0",
+            "llm_raw_response": llm_result.reasoning if llm_result and llm_result.reasoning else "N/A",
         }
 
         repo.update(detection_id, update_data)

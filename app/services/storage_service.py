@@ -129,7 +129,7 @@ class StorageService:
         Retrieve file from storage.
 
         Args:
-            file_path: Path to the file in storage
+            file_path: Relative path to the file in storage (e.g., "detections/1/2025/01/uuid.jpg")
 
         Returns:
             File content as bytes
@@ -146,8 +146,9 @@ class StorageService:
                 )
                 return response['Body'].read()
             else:
-                # Read from local filesystem
-                with open(file_path, 'rb') as f:
+                # Read from local filesystem - prepend upload_dir to relative path
+                full_path = self.upload_dir / file_path
+                with open(full_path, 'rb') as f:
                     return f.read()
 
         except ClientError as e:
